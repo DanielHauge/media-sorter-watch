@@ -2,7 +2,6 @@ use std::fs;
 use std::{path::PathBuf, env::args};
 use std::path::{Path};
 
-
 pub fn sort_path(path: &PathBuf){
     println!("Sort_path");
 
@@ -36,7 +35,9 @@ fn sort_file(source: &PathBuf){
     let target_dir = args().skip(2).next().expect("there should be atleast 3 runtime args");
     let destination= Path::new(&target_dir).join(name).join(season).join(source.file_name().unwrap());
     fs::create_dir_all(destination.parent().unwrap()).expect("create dir all failed: ");
-    fs::rename(source, destination).expect("file move failed: ")
+    // Using copy->remove as move/rename assumes atomic operation which is not possible for cross-device linking.
+    fs::copy(source, destination).expect("could not copy");
+    fs::remove_file(source).expect("could not remove old file");
 }
 
 fn resolve_season(name: &str) -> (&str, String){
