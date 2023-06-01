@@ -2,7 +2,7 @@ mod sorter;
 use notify::{RecursiveMode, Watcher, Event, Error, PollWatcher, Config};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
-use std::env::{args};
+use std::env::args;
 use std::time::Duration;
 
 
@@ -26,27 +26,22 @@ fn watch(path: &Path) {
     .with_poll_interval(Duration::from_secs(2))
     .with_compare_contents(true);
 
-    let mut watcher = PollWatcher::new(sender, config).unwrap();
+    let mut watcher = PollWatcher::new(sender, config).expect("Creating PollWatcher");
 
-    // Add a path to be watched. All files and directories at that path and
-    // below will be monitored for changes.
-    watcher.watch(path, RecursiveMode::Recursive).unwrap();
+    watcher.watch(path, RecursiveMode::Recursive).expect("Starting PollWatcher");
 
     loop {
-        
         match receiver.recv() {
-            
            Ok(event) => handle_receive(event),
            Err(e) => println!("watch error: {:?}", e),
         }
-
     }
 }
 
 fn handle_receive(result: Result<Event, Error>){
     match result {
         Ok(event) => handle_event(event),
-        Err(error) => println!("watch error: {:?}", error),
+        Err(error) => eprintln!("watch error: {:?}", error),
     }
 }
 
@@ -61,6 +56,6 @@ fn handle_event(event: Event){
 fn handle_file(paths: Vec<PathBuf>){
     match paths.first(){
         Some(path) => sorter::sort_path(path),
-        p => println!("No path found: {:?}", p)
+        _ => eprintln!("No path found: {:?}", paths)
     }
 }

@@ -1,11 +1,12 @@
 use std::fs;
-use std::{path::PathBuf, env::args};
-use std::path::{Path};
+use std::io::Error;
+use std::env::args;
+use std::path::Path;
 
-pub fn sort_path(path: &PathBuf){
+pub fn sort_path(path: &Path){
     println!("Sort_path {:?}", path);
 
-    let file_name=path.file_name().unwrap().to_str().unwrap();
+    let file_name=path.file_name().expect("Extract file name").to_str().expect("Own string");
     if !file_name.starts_with("[SubsPlease]") { 
         println!("Will not sort path: {:?}", path);
         return; 
@@ -16,34 +17,52 @@ pub fn sort_path(path: &PathBuf){
     } else if path.is_dir(){
         sort_dir(path)
     }
+
 }
 
-fn sort_dir(path: &PathBuf){
+fn sort_dir(path: &Path){
     for entry in path.read_dir().expect("Read directory failed"){
         match entry {
-            Err(e) => println!("Error occured during read of : {:?}", e),
-            Ok(entry) => sort_path(&entry.path())
+            Ok(entry) => sort_path(&entry.path()),
+            Err(e) => eprintln!("Error occured during read of : {:?}", e),
         }
+    }
+    match fs::remove_dir(path){
+        Ok(_) => println!("Deleted empty dir {:?}", path),
+        Err(e) => println!("Did not delete dir: {:?}, because: {:?}", path, e)
     }
 }
 
-fn sort_file(source: &PathBuf){
+fn sort_file(source: &Path){
 
-    let file_name = source.file_stem().unwrap().to_str().unwrap().replace("[SubsPlease] ", "");
+    let file_name = source.file_stem().expect("File needs valid stem").to_str().unwrap().replace("[SubsPlease] ", "");
     let name_cleaned = file_name.split(" -").next().unwrap();
-    let (season,name) = resolve_season(name_cleaned);
-    let target_dir = args().skip(2).next().expect("there should be atleast 3 runtime args");
+    let (season,name) = resolve_season_name(name_cleaned);
+    let target_dir = args().nth(2).expect("there should be atleast 3 runtime args");
     let destination= Path::new(&target_dir).join(name).join(season).join(source.file_name().unwrap());
-    fs::create_dir_all(destination.parent().unwrap()).expect("create dir all failed: ");
-    // Using copy->remove as move/rename assumes atomic operation which is not possible for cross-device linking.
-    fs::copy(source, destination).expect("could not copy");
-    fs::remove_file(source).expect("could not remove old file");
+    rename_or_copydel(source, &destination)
 }
 
-fn resolve_season(name: &str) -> (&str, String){
+fn rename_or_copydel(source: &Path, dest: &Path){
+    fs::create_dir_all(dest.parent().unwrap()).expect("create dir all failed: ");
+    match fs::rename(source, dest) {
+        Err(e) => copy_delete(e, source, dest),
+        _ => println!("Moved file: {:?} to {:?}", source, dest)
+    }
+}
+
+fn copy_delete(error: Error, source: &Path, dest: &Path){
+    eprintln!("Error moving file: {:?}", error);
+    match fs::copy(source, dest){
+        Ok(_) => fs::remove_file(source).expect("can remove file after copy"),
+        Err(e) => eprint!("Could not copy because: {:?}", e),
+    }
+}
+
+fn resolve_season_name(name: &str) -> (&str, String){
     // Is this good? No. But fuck it, this is quick poc
     if name.contains("S2"){
-        return ("Season 02", name.replace(" S2", ""))
+        ("Season 02", name.replace(" S2", ""))
     } else if name.contains("S3"){
         return ("Season 03", name.replace(" S3", ""))
     } else if name.contains("S4"){
@@ -53,4 +72,30 @@ fn resolve_season(name: &str) -> (&str, String){
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    #[test]
+    fn test_resolve_season_name_without_s1() {
+        let (season, name) = resolve_season_name("stuff");
+        assert_eq!(name, "stuff");
+        assert_eq!(season, "Season 01")
+    }
+
+    #[test]
+    fn test_resolve_season_name_with_s1() {
+        let (season, name) = resolve_season_name("stuff S1");
+        assert_eq!(name, "stuff");
+        assert_eq!(season, "Season 01")
+    }
+
+    #[test]
+    fn test_resolve_season_name_with_s2() {
+        let (season, name) = resolve_season_name("stuff S2");
+        assert_eq!(name, "stuff");
+        assert_eq!(season, "Season 02")
+    }
+
+
+}
