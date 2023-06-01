@@ -3,7 +3,7 @@ use std::{path::PathBuf, env::args};
 use std::path::{Path};
 
 pub fn sort_path(path: &PathBuf){
-    println!("Sort_path");
+    println!("Sort_path {:?}", path);
 
     let file_name=path.file_name().unwrap().to_str().unwrap();
     if !file_name.starts_with("[SubsPlease]") { 
