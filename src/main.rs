@@ -1,61 +1,27 @@
 mod sorter;
-use notify::{RecursiveMode, Watcher, Event, Error, PollWatcher, Config};
-use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
-use std::env::args;
-use std::time::Duration;
-
+use sorter::sort;
+use std::{
+    env::{self, args},
+    path::Path,
+};
 
 fn main() {
-    println!("Hello, world!");
+    let sort_path_str = match args().nth(1) {
+        Some(path) => path,
+        None => match env::var_os("UNCLEANED_PATH") {
+            Some(path) => path.into_string().expect("Invalid path"),
+            None => ".".to_string(),
+        },
+    };
+    let target_dir_str = match args().nth(2) {
+        Some(path) => path,
+        None => match env::var_os("ANIME_PATH") {
+            Some(path) => path.into_string().expect("Invalid path"),
+            None => panic!("No target directory provided"),
+        },
+    };
 
-    let mut args = args().skip(1);
-    let watch_dir = args.next();
-    let target_dir = args.next();
-
-    match (watch_dir, target_dir) {
-        (Some(w), Some(_)) => watch(Path::new(&w)),
-        _ => panic!("Watch dir and target dir was not specified")
-    }
-}
-
-fn watch(path: &Path) {
-    let (sender, receiver) = channel();
-
-    let config= Config::default()
-    .with_poll_interval(Duration::from_secs(2))
-    .with_compare_contents(true);
-
-    let mut watcher = PollWatcher::new(sender, config).expect("Creating PollWatcher");
-
-    watcher.watch(path, RecursiveMode::Recursive).expect("Starting PollWatcher");
-
-    loop {
-        match receiver.recv() {
-           Ok(event) => handle_receive(event),
-           Err(e) => println!("watch error: {:?}", e),
-        }
-    }
-}
-
-fn handle_receive(result: Result<Event, Error>){
-    match result {
-        Ok(event) => handle_event(event),
-        Err(error) => eprintln!("watch error: {:?}", error),
-    }
-}
-
-fn handle_event(event: Event){
-    match event.kind {
-        notify::EventKind::Create(_) => handle_file(event.paths),
-        notify::EventKind::Modify(_) => handle_file(event.paths),
-        e => println!("Unhandled event: {:?}", e),
-    }
-}
-
-fn handle_file(paths: Vec<PathBuf>){
-    match paths.first(){
-        Some(path) => sorter::sort_path(path),
-        _ => eprintln!("No path found: {:?}", paths)
-    }
+    let sort_path = Path::new(&sort_path_str);
+    let target_dir = Path::new(&target_dir_str);
+    sort(sort_path, target_dir);
 }

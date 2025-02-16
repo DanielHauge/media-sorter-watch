@@ -1,1 +1,3 @@
-# media-sorter-watch
+# msort
+
+sorts media files
