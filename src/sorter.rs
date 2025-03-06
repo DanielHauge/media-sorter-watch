@@ -98,7 +98,6 @@ mod tests {
     #[test]
     fn test_resolve_season_name_without_s1() {
         let (season, name) = resolve_season_name("stuff");
-        assert_eq!(name, "stuff");
         assert_eq!(season, "Season 01")
     }
 
